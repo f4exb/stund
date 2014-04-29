@@ -1,0 +1,40 @@
+STUN server and client. The server has the option to reply with a fixed (fake) mapped address to any request.
+
+This option is useful when you work with a fixed address on the "public" side but you cannot reach a 
+STUN server. For example the mesh network through which you want to route SIP calls are using routers 
+that cannot support a STUN server.
+
+Originally the code also accepted a single address; -a argument is optional just issuing a warning. 
+
+
+Here is the server help describing all options:
+
+STUN server version 0.9f
+Usage: 
+ ./server [-v] [-h] [-h IP_Address] [-a IP_Address] [-f IP_Address] [-p port] [-o port] [-m mediaport]
+ 
+ If the IP addresses of your NIC are 10.0.1.150 and 10.0.1.151, run this program with
+    ./server -v  -h 10.0.1.150 -a 10.0.1.151
+ STUN servers need two IP addresses and two ports, these can be specified with:
+  -h sets the primary IP
+  -a sets the secondary IP
+  -f sets the fake mapped IP
+  -p sets the primary port and defaults to 3478
+  -o sets the secondary port and defaults to 3479
+  -b makes the program run in the backgroud
+  -m sets up a STERN server starting at port m
+  -v runs in verbose mode
+
+
+And the client:
+
+STUN client version 0.9f
+Usage:
+    ./client stunServerHostname [testNumber] [-v] [-p srcPort] [-i nicAddr1] [-i nicAddr2] [-i nicAddr3]
+For example, if the STUN server was larry.gloo.net, you could do:
+    ./client larry.gloo.net
+The testNumber is just used for special tests.
+ test 1 runs test 1 from the RFC. For example:
+    ./client larry.gloo.net 0
+
+

@@ -23,13 +23,14 @@ void
 usage()
 {
    cerr << "Usage: " << endl
-        << " ./server [-v] [-h] [-h IP_Address] [-a IP_Address] [-p port] [-o port] [-m mediaport]" << endl
+        << " ./server [-v] [-h] [-h IP_Address] [-a IP_Address] [-f IP_Address] [-p port] [-o port] [-m mediaport]" << endl
         << " " << endl
         << " If the IP addresses of your NIC are 10.0.1.150 and 10.0.1.151, run this program with" << endl
         << "    ./server -v  -h 10.0.1.150 -a 10.0.1.151" << endl
         << " STUN servers need two IP addresses and two ports, these can be specified with:" << endl
         << "  -h sets the primary IP" << endl
         << "  -a sets the secondary IP" << endl
+        << "  -f sets the fake mapped IP" << endl
         << "  -p sets the primary port and defaults to 3478" << endl
         << "  -o sets the secondary port and defaults to 3479" << endl
         << "  -b makes the program run in the backgroud" << endl
@@ -53,13 +54,16 @@ main(int argc, char* argv[])
       
    StunAddress4 myAddr;
    StunAddress4 altAddr;
+   StunAddress4 fakeAddr;
    bool verbose=false;
    bool background=false;
    
    myAddr.addr = 0;
    altAddr.addr = 0;
+   fakeAddr.addr = 0;
    myAddr.port = STUN_PORT;
    altAddr.port = STUN_PORT+1;
+   fakeAddr.port = STUN_PORT;
    int myPort = 0;
    int altPort = 0;
    int myMediaPort = 0;
@@ -104,6 +108,16 @@ main(int argc, char* argv[])
             exit(-1);
          }
          stunParseServerName(argv[arg], altAddr);
+      }
+      else if ( !strcmp( argv[arg] , "-f" ) )
+      {
+         arg++;
+         if ( argc <= arg ) 
+         {
+            usage();
+            exit(-1);
+         }
+         stunParseServerName(argv[arg], fakeAddr);
       }
       else if ( !strcmp( argv[arg] , "-p" ) )
       {
@@ -184,7 +198,7 @@ main(int argc, char* argv[])
    
    if ( altAddr.addr == 0 )
    {
-      cerr << "Warning - no alternate ip address STUN will not work" << endl;
+      cerr << "Warning - no alternate ip address STUN will not work as per standard" << endl;
       //exit(1);
    }
    
@@ -214,7 +228,7 @@ main(int argc, char* argv[])
    if (pid == 0) //child or not using background
    {
       StunServerInfo info;
-      bool ok = stunInitServer(info, myAddr, altAddr, myMediaPort, verbose);
+      bool ok = stunInitServer(info, myAddr, altAddr, fakeAddr, myMediaPort, verbose);
       
       int c=0;
       while (ok)

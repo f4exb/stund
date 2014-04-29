@@ -12,7 +12,7 @@ TARS= client.cxx  server.cxx  stun.cxx  stun.h  tlsServer.cxx  udp.cxx  udp.h \
 	WinStunSetup/WinStunSetup.vdproj
 
 # if you chnage this version, change in stun.h too 
-VERSION=0.96
+VERSION=0.9f
 
 #CXXFLAGS+=-O2
 #LDFLAGS+=-O2 -lssl

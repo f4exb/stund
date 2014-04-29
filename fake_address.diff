@@ -1,0 +1,176 @@
+diff --git a/Makefile b/Makefile
+index 889dc7e..2bfb451 100644
+--- a/Makefile
++++ b/Makefile
+@@ -12,7 +12,7 @@ TARS= client.cxx  server.cxx  stun.cxx  stun.h  tlsServer.cxx  udp.cxx  udp.h \
+ 	WinStunSetup/WinStunSetup.vdproj
+ 
+ # if you chnage this version, change in stun.h too 
+-VERSION=0.96
++VERSION=0.9f
+ 
+ #CXXFLAGS+=-O2
+ #LDFLAGS+=-O2 -lssl
+diff --git a/readme.txt b/readme.txt
+index e20d064..f0bb773 100644
+--- a/readme.txt
++++ b/readme.txt
+@@ -6,15 +6,16 @@ You need to have 2 IP addresses next to each other to run the STUN server.
+ 
+ 
+ 
+-STUN server version 0.97
++STUN server version 0.97f
+ Usage: 
+- ./server [-v] [-h] [-h IP_Address] [-a IP_Address] [-p port] [-o port] [-m mediaport]
++ ./server [-v] [-h] [-h IP_Address] [-a IP_Address] [-f IP_Address] [-p port] [-o port] [-m mediaport]
+  
+  If the IP addresses of your NIC are 10.0.1.150 and 10.0.1.151, run this program with
+     ./server -v  -h 10.0.1.150 -a 10.0.1.151
+  STUN servers need two IP addresses and two ports, these can be specified with:
+   -h sets the primary IP
+   -a sets the secondary IP
++  -f sets the fake mapped IP
+   -p sets the primary port and defaults to 3478
+   -o sets the secondary port and defaults to 3479
+   -b makes the program run in the backgroud
+diff --git a/server.cxx b/server.cxx
+index 3627f0c..56de805 100644
+--- a/server.cxx
++++ b/server.cxx
+@@ -23,13 +23,14 @@ void
+ usage()
+ {
+    cerr << "Usage: " << endl
+-        << " ./server [-v] [-h] [-h IP_Address] [-a IP_Address] [-p port] [-o port] [-m mediaport]" << endl
++        << " ./server [-v] [-h] [-h IP_Address] [-a IP_Address] [-f IP_Address] [-p port] [-o port] [-m mediaport]" << endl
+         << " " << endl
+         << " If the IP addresses of your NIC are 10.0.1.150 and 10.0.1.151, run this program with" << endl
+         << "    ./server -v  -h 10.0.1.150 -a 10.0.1.151" << endl
+         << " STUN servers need two IP addresses and two ports, these can be specified with:" << endl
+         << "  -h sets the primary IP" << endl
+         << "  -a sets the secondary IP" << endl
++        << "  -f sets the fake mapped IP" << endl
+         << "  -p sets the primary port and defaults to 3478" << endl
+         << "  -o sets the secondary port and defaults to 3479" << endl
+         << "  -b makes the program run in the backgroud" << endl
+@@ -53,13 +54,16 @@ main(int argc, char* argv[])
+       
+    StunAddress4 myAddr;
+    StunAddress4 altAddr;
++   StunAddress4 fakeAddr;
+    bool verbose=false;
+    bool background=false;
+    
+    myAddr.addr = 0;
+    altAddr.addr = 0;
++   fakeAddr.addr = 0;
+    myAddr.port = STUN_PORT;
+    altAddr.port = STUN_PORT+1;
++   fakeAddr.port = STUN_PORT;
+    int myPort = 0;
+    int altPort = 0;
+    int myMediaPort = 0;
+@@ -105,6 +109,16 @@ main(int argc, char* argv[])
+          }
+          stunParseServerName(argv[arg], altAddr);
+       }
++      else if ( !strcmp( argv[arg] , "-f" ) )
++      {
++         arg++;
++         if ( argc <= arg ) 
++         {
++            usage();
++            exit(-1);
++         }
++         stunParseServerName(argv[arg], fakeAddr);
++      }
+       else if ( !strcmp( argv[arg] , "-p" ) )
+       {
+          arg++;
+@@ -184,7 +198,7 @@ main(int argc, char* argv[])
+    
+    if ( altAddr.addr == 0 )
+    {
+-      cerr << "Warning - no alternate ip address STUN will not work" << endl;
++      cerr << "Warning - no alternate ip address STUN will not work as per standard" << endl;
+       //exit(1);
+    }
+    
+@@ -214,7 +228,7 @@ main(int argc, char* argv[])
+    if (pid == 0) //child or not using background
+    {
+       StunServerInfo info;
+-      bool ok = stunInitServer(info, myAddr, altAddr, myMediaPort, verbose);
++      bool ok = stunInitServer(info, myAddr, altAddr, fakeAddr, myMediaPort, verbose);
+       
+       int c=0;
+       while (ok)
+diff --git a/stun.cxx b/stun.cxx
+index 6126bce..8582b78 100644
+--- a/stun.cxx
++++ b/stun.cxx
+@@ -1246,7 +1246,9 @@ stunServerProcessMsg( char* buf,
+ 
+ bool
+ stunInitServer(StunServerInfo& info, const StunAddress4& myAddr,
+-               const StunAddress4& altAddr, int startMediaPort, bool verbose )
++               const StunAddress4& altAddr, 
++               const StunAddress4& fakeAddr,
++               int startMediaPort, bool verbose )
+ {
+    assert( myAddr.port != 0 );
+    assert( altAddr.port!= 0 );
+@@ -1255,6 +1257,7 @@ stunInitServer(StunServerInfo& info, const StunAddress4& myAddr,
+ 	
+    info.myAddr = myAddr;
+    info.altAddr = altAddr;
++   info.fakeAddr = fakeAddr;
+ 	
+    info.myFd = INVALID_SOCKET;
+    info.altPortFd = INVALID_SOCKET;
+@@ -1571,6 +1574,15 @@ stunServerProcess(StunServerInfo& info, bool verbose)
+          return true;
+       }
+ 		
++
++      if (info.fakeAddr.addr)
++      {
++         UInt32 id32 = resp.mappedAddress.ipv4.addr^resp.xorMappedAddress.ipv4.addr;
++         resp.mappedAddress.ipv4.addr = info.fakeAddr.addr;
++         resp.xorMappedAddress.ipv4.addr = info.fakeAddr.addr^id32;
++         if ( verbose ) clog << "Mapped address replaced with fake address " << info.fakeAddr << endl;
++      }
++
+       char buf[STUN_MAX_MESSAGE_SIZE];
+       int len = sizeof(buf);
+       		
+diff --git a/stun.h b/stun.h
+index 517011c..e3ddef8 100644
+--- a/stun.h
++++ b/stun.h
+@@ -5,7 +5,7 @@
+ #include <time.h>
+ 
+ // if you change this version, change in makefile too 
+-#define STUN_VERSION "0.97"
++#define STUN_VERSION "0.9f"
+ 
+ #define STUN_MAX_STRING 256
+ #define STUN_MAX_UNKNOWN_ATTRIBUTES 8
+@@ -217,6 +217,7 @@ typedef struct
+ {
+       StunAddress4 myAddr;
+       StunAddress4 altAddr;
++      StunAddress4 fakeAddr;
+       Socket myFd;
+       Socket altPortFd;
+       Socket altIpFd;
+@@ -276,6 +277,7 @@ bool
+ stunInitServer(StunServerInfo& info, 
+                const StunAddress4& myAddr, 
+                const StunAddress4& altAddr,
++               const StunAddress4& fakeAddr,
+                int startMediaPort,
+                bool verbose);
+ 

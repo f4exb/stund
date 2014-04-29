@@ -1246,7 +1246,9 @@ stunServerProcessMsg( char* buf,
 
 bool
 stunInitServer(StunServerInfo& info, const StunAddress4& myAddr,
-               const StunAddress4& altAddr, int startMediaPort, bool verbose )
+               const StunAddress4& altAddr, 
+               const StunAddress4& fakeAddr,
+               int startMediaPort, bool verbose )
 {
    assert( myAddr.port != 0 );
    assert( altAddr.port!= 0 );
@@ -1255,6 +1257,7 @@ stunInitServer(StunServerInfo& info, const StunAddress4& myAddr,
 	
    info.myAddr = myAddr;
    info.altAddr = altAddr;
+   info.fakeAddr = fakeAddr;
 	
    info.myFd = INVALID_SOCKET;
    info.altPortFd = INVALID_SOCKET;
@@ -1571,6 +1574,15 @@ stunServerProcess(StunServerInfo& info, bool verbose)
          return true;
       }
 		
+
+      if (info.fakeAddr.addr)
+      {
+         UInt32 id32 = resp.mappedAddress.ipv4.addr^resp.xorMappedAddress.ipv4.addr;
+         resp.mappedAddress.ipv4.addr = info.fakeAddr.addr;
+         resp.xorMappedAddress.ipv4.addr = info.fakeAddr.addr^id32;
+         if ( verbose ) clog << "Mapped address replaced with fake address " << info.fakeAddr << endl;
+      }
+
       char buf[STUN_MAX_MESSAGE_SIZE];
       int len = sizeof(buf);
       		

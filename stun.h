@@ -5,7 +5,7 @@
 #include <time.h>
 
 // if you change this version, change in makefile too 
-#define STUN_VERSION "0.97"
+#define STUN_VERSION "0.9f"
 
 #define STUN_MAX_STRING 256
 #define STUN_MAX_UNKNOWN_ATTRIBUTES 8
@@ -217,6 +217,7 @@ typedef struct
 {
       StunAddress4 myAddr;
       StunAddress4 altAddr;
+      StunAddress4 fakeAddr;
       Socket myFd;
       Socket altPortFd;
       Socket altIpFd;
@@ -276,6 +277,7 @@ bool
 stunInitServer(StunServerInfo& info, 
                const StunAddress4& myAddr, 
                const StunAddress4& altAddr,
+               const StunAddress4& fakeAddr,
                int startMediaPort,
                bool verbose);
 
